@@ -1,0 +1,12 @@
+{
+  "name": "coin-watch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Friendly solo CKPool bitcoin miner monitor",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

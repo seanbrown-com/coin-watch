@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Coin Watch</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Solo CKPool monitor</p>
+        <div class="title-lockup">
+          <img src="/favicon.svg" alt="" width="64" height="64" aria-hidden="true">
+          <h1>Coin Watch</h1>
+        </div>
+        <p class="lede">A friendlier view of whether your miner is alive, how fast it is hashing, and how close its best share has come to a solo block.</p>
+      </div>
+      <div class="refresh-panel" aria-live="polite">
+        <span id="refreshStatus">Waiting to refresh</span>
+        <button id="refreshNow" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="summary-band" aria-label="Mining summary">
+        <div class="summary-item">
+          <span class="label">Fleet hashrate</span>
+          <strong id="fleetHashrate">--</strong>
+          <span id="fleetHashrateNote">Add a miner to begin.</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">Active workers</span>
+          <strong id="fleetWorkers">--</strong>
+          <span id="fleetWorkersNote">No workers loaded yet.</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">Best share progress</span>
+          <strong id="fleetProgress">--</strong>
+          <span id="fleetProgressNote">Compared with Bitcoin difficulty.</span>
+        </div>
+      </section>
+
+      <section class="add-miner" aria-label="Add miner">
+        <div>
+          <h2>Add or Update a Miner</h2>
+          <p>Paste the Bitcoin address you use as the CKPool username. If you paste a full worker name, Coin Watch will use the address before the dot.</p>
+        </div>
+        <form id="minerForm">
+          <label>
+            <span>Miner name</span>
+            <input id="minerName" name="name" type="text" placeholder="Garage miner">
+          </label>
+          <label>
+            <span>Bitcoin address or worker</span>
+            <input id="minerAddress" name="address" type="text" autocomplete="off" required placeholder="bc1q...">
+          </label>
+          <label>
+            <span>Region</span>
+            <select id="minerHost" name="host">
+              <option value="solo.ckpool.org">Americas</option>
+              <option value="eusolo.ckpool.org">Europe / Africa</option>
+              <option value="sgsolo.ckpool.org">Asia / Middle East</option>
+              <option value="ausolo.ckpool.org">Oceania</option>
+            </select>
+          </label>
+          <button type="submit">Save Miner</button>
+        </form>
+      </section>
+
+      <section class="explain-band" aria-label="How to read progress">
+        <h2>What “Progress” Means</h2>
+        <p>Solo mining is a lottery, not a savings account. Your best share is the closest ticket your miner has submitted so far; a block happens only when a share beats the current Bitcoin network difficulty.</p>
+      </section>
+
+      <section id="minerList" class="miner-list" aria-label="Miners"></section>
+    </main>
+
+    <template id="minerTemplate">
+      <article class="miner-card">
+        <div class="miner-heading">
+          <div>
+            <p class="eyebrow miner-region"></p>
+            <h2 class="miner-title"></h2>
+            <p class="miner-address"></p>
+          </div>
+          <div class="miner-actions">
+            <span class="status-pill"></span>
+            <button class="remove-miner" type="button" aria-label="Remove miner">Remove</button>
+          </div>
+        </div>
+
+        <div class="plain-status"></div>
+
+        <div class="metric-grid">
+          <div class="metric">
+            <span class="label">Now</span>
+            <strong class="hashrate-now"></strong>
+            <span class="metric-note hashrate-note"></span>
+          </div>
+          <div class="metric">
+            <span class="label">Last Share</span>
+            <strong class="last-share"></strong>
+            <span class="metric-note last-share-note"></span>
+          </div>
+          <div class="metric">
+            <span class="label">Best Share</span>
+            <strong class="best-share"></strong>
+            <span class="metric-note best-share-note"></span>
+          </div>
+          <div class="metric">
+            <span class="label">Daily Odds</span>
+            <strong class="daily-odds"></strong>
+            <span class="metric-note daily-odds-note"></span>
+          </div>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress-label">
+            <span>Closest submitted share vs. current block difficulty</span>
+            <strong class="progress-value"></strong>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <span class="progress-bar"></span>
+          </div>
+        </div>
+
+        <details>
+          <summary>Workers and raw stats</summary>
+          <div class="worker-list"></div>
+          <pre class="raw-json"></pre>
+        </details>
+      </article>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
