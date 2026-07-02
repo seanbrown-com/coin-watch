@@ -10,22 +10,14 @@ const HASH_UNITS = {
   E: 1e18
 };
 
-const DEFAULT_MINERS = [
-  {
-    id: "solo.ckpool.org:bc1q6dyj9jafvjcjx0qmpwjdcw4tytkmqn2tnskjsxalzwtr4fmwzu6splgggt",
-    name: "River miner",
-    address: "bc1q6dyj9jafvjcjx0qmpwjdcw4tytkmqn2tnskjsxalzwtr4fmwzu6splgggt",
-    host: "solo.ckpool.org"
-  }
-];
-
 const state = {
-  miners: loadMiners(),
+  miners: [],
   results: new Map(),
   difficulty: null,
   refreshTimer: null,
   countdownTimer: null,
-  nextRefreshAt: null
+  nextRefreshAt: null,
+  loaded: false
 };
 
 const elements = {
@@ -42,16 +34,44 @@ const elements = {
   fleetProgressNote: document.querySelector("#fleetProgressNote")
 };
 
-function loadMiners() {
+function loadLocalMiners() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    return Array.isArray(saved) && saved.length ? saved : DEFAULT_MINERS;
+    return Array.isArray(saved) ? saved : [];
   } catch {
-    return DEFAULT_MINERS;
+    return [];
   }
 }
 
-function saveMiners() {
+async function loadMiners() {
+  try {
+    const payload = await fetchJson("/api/miners");
+    state.miners = Array.isArray(payload.miners) ? payload.miners : [];
+
+    const localMiners = loadLocalMiners();
+    if (!state.miners.length && localMiners.length) {
+      state.miners = localMiners;
+      await saveMiners();
+    }
+  } catch {
+    state.miners = loadLocalMiners();
+  } finally {
+    state.loaded = true;
+  }
+}
+
+async function saveMiners() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.miners));
+  const response = await fetch("/api/miners", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ miners: state.miners })
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Unable to save miners.");
+  }
+  state.miners = Array.isArray(payload.miners) ? payload.miners : state.miners;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.miners));
 }
 
@@ -314,6 +334,14 @@ function renderMiner(miner) {
 function render() {
   renderSummary();
   elements.list.replaceChildren();
+  if (!state.loaded) {
+    const loading = document.createElement("div");
+    loading.className = "empty";
+    loading.textContent = "Loading saved miners...";
+    elements.list.append(loading);
+    return;
+  }
+
   if (!state.miners.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
@@ -326,7 +354,7 @@ function render() {
   });
 }
 
-function upsertMiner(formData) {
+async function upsertMiner(formData) {
   const address = normalizeMinerAddress(formData.get("address"));
   const host = formData.get("host");
   const name = String(formData.get("name") || "").trim() || shortAddress(address);
@@ -340,17 +368,29 @@ function upsertMiner(formData) {
     state.miners.push(nextMiner);
   }
 
-  saveMiners();
-  elements.form.reset();
-  render();
-  refreshMiners();
+  try {
+    await saveMiners();
+    elements.form.reset();
+    render();
+    refreshMiners();
+  } catch (error) {
+    state.results.set(id, { ok: false, error: error.message });
+    render();
+  }
 }
 
-function removeMiner(id) {
+async function removeMiner(id) {
+  const previousMiners = state.miners;
   state.miners = state.miners.filter((miner) => miner.id !== id);
   state.results.delete(id);
-  saveMiners();
-  render();
+  try {
+    await saveMiners();
+    render();
+  } catch (error) {
+    state.miners = previousMiners;
+    state.results.set(id, { ok: false, error: error.message });
+    render();
+  }
 }
 
 elements.form.addEventListener("submit", (event) => {
@@ -360,5 +400,11 @@ elements.form.addEventListener("submit", (event) => {
 
 elements.refreshNow.addEventListener("click", refreshMiners);
 
-render();
-refreshMiners();
+async function init() {
+  render();
+  await loadMiners();
+  render();
+  refreshMiners();
+}
+
+init();

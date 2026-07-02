@@ -1,12 +1,15 @@
 const http = require("node:http");
 const https = require("node:https");
 const fs = require("node:fs");
+const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { URL } = require("node:url");
 
 const PORT = Number(process.env.PORT || 8002);
 const HOST = process.env.HOST || "127.0.0.1";
 const PUBLIC_DIR = path.join(__dirname, "public");
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+const MINERS_FILE = path.join(DATA_DIR, "miners.json");
 
 const CKPOOL_HOSTS = new Set([
   "solo.ckpool.org",
@@ -72,6 +75,95 @@ function normalizeMinerId(value) {
 
 function isProbablyMinerId(value) {
   return /^[a-zA-Z0-9]{26,90}$/.test(value);
+}
+
+function normalizeMiner(miner) {
+  const host = String(miner?.host || "solo.ckpool.org").trim();
+  const address = normalizeMinerId(miner?.address);
+  const name = String(miner?.name || "").trim().slice(0, 80);
+
+  if (!CKPOOL_HOSTS.has(host) || !isProbablyMinerId(address)) {
+    return null;
+  }
+
+  return {
+    id: `${host}:${address}`,
+    name: name || address,
+    address,
+    host
+  };
+}
+
+async function readRequestBody(req, limitBytes = 100000) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (Buffer.byteLength(body, "utf8") > limitBytes) {
+        reject(new Error("Request body is too large."));
+        req.destroy();
+      }
+    });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
+async function readSavedMiners() {
+  try {
+    const content = await fsp.readFile(MINERS_FILE, "utf8");
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeMiner).filter(Boolean);
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+async function writeSavedMiners(miners) {
+  const normalized = [];
+  const seen = new Set();
+
+  for (const miner of miners) {
+    const next = normalizeMiner(miner);
+    if (!next || seen.has(next.id)) continue;
+    seen.add(next.id);
+    normalized.push(next);
+  }
+
+  await fsp.mkdir(DATA_DIR, { recursive: true });
+  await fsp.writeFile(MINERS_FILE, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
+  return normalized;
+}
+
+async function handleMinersApi(req, res) {
+  if (req.method === "GET") {
+    try {
+      sendJson(res, 200, { miners: await readSavedMiners() });
+    } catch (error) {
+      sendJson(res, 500, { error: `Unable to read saved miners: ${error.message}` });
+    }
+    return;
+  }
+
+  if (req.method === "PUT") {
+    try {
+      const body = await readRequestBody(req);
+      const payload = JSON.parse(body || "{}");
+      if (!Array.isArray(payload.miners)) {
+        sendJson(res, 400, { error: "Expected a miners array." });
+        return;
+      }
+      sendJson(res, 200, { miners: await writeSavedMiners(payload.miners) });
+    } catch (error) {
+      sendJson(res, 400, { error: `Unable to save miners: ${error.message}` });
+    }
+    return;
+  }
+
+  sendJson(res, 405, { error: "Method not allowed." });
 }
 
 async function handleMinerApi(reqUrl, res) {
@@ -158,6 +250,11 @@ function serveStatic(reqUrl, res) {
 
 const server = http.createServer((req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+
+  if (reqUrl.pathname === "/api/miners") {
+    handleMinersApi(req, res);
+    return;
+  }
 
   if (reqUrl.pathname === "/api/miner") {
     handleMinerApi(reqUrl, res);
