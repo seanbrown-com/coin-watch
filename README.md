@@ -28,6 +28,14 @@ Solo mining progress is not cumulative. The best share is the closest attempt so
 
 ## Update on an LXC
 
+For a first-time install inside a Debian/Ubuntu LXC, run as root:
+
+```sh
+REPO_URL=https://github.com/seanbrown-com/coin-watch.git bash scripts/install-lxc.sh
+```
+
+This installs required packages, checks out the app to `/opt/coin-watch`, creates a `coin-watch` system user, writes a systemd service, and starts the app on port `8002`.
+
 If the app is deployed as a git checkout and managed by systemd, use:
 
 ```sh

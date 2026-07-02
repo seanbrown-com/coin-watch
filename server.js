@@ -5,7 +5,7 @@ const path = require("node:path");
 const { URL } = require("node:url");
 
 const PORT = Number(process.env.PORT || 8002);
-const HOST = "127.0.0.1";
+const HOST = process.env.HOST || "127.0.0.1";
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 const CKPOOL_HOSTS = new Set([
@@ -184,7 +184,8 @@ function listen(port, attemptsRemaining = 10) {
   });
 
   server.listen(port, HOST, () => {
-    console.log(`Coin Watch is running at http://localhost:${port}`);
+    const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
+    console.log(`Coin Watch is running at http://${displayHost}:${port}`);
   });
 }
 
