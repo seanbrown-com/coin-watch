@@ -17,7 +17,8 @@ const state = {
   refreshTimer: null,
   countdownTimer: null,
   nextRefreshAt: null,
-  loaded: false
+  loaded: false,
+  loadError: null
 };
 
 const elements = {
@@ -46,33 +47,37 @@ function loadLocalMiners() {
 async function loadMiners() {
   try {
     const payload = await fetchJson("/api/miners");
-    state.miners = Array.isArray(payload.miners) ? payload.miners : [];
+    const serverMiners = Array.isArray(payload.miners) ? payload.miners : [];
 
     const localMiners = loadLocalMiners();
-    if (!state.miners.length && localMiners.length) {
-      state.miners = localMiners;
-      await saveMiners();
+    if (!serverMiners.length && localMiners.length) {
+      state.miners = await saveMiners(localMiners);
+    } else {
+      state.miners = serverMiners;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.miners));
     }
-  } catch {
-    state.miners = loadLocalMiners();
+    state.loadError = null;
+  } catch (error) {
+    state.miners = [];
+    state.loadError = error.message;
   } finally {
     state.loaded = true;
   }
 }
 
-async function saveMiners() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.miners));
+async function saveMiners(miners) {
   const response = await fetch("/api/miners", {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ miners: state.miners })
+    body: JSON.stringify({ miners })
   });
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.error || "Unable to save miners.");
   }
-  state.miners = Array.isArray(payload.miners) ? payload.miners : state.miners;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.miners));
+  const savedMiners = Array.isArray(payload.miners) ? payload.miners : [];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedMiners));
+  return savedMiners;
 }
 
 function normalizeMinerAddress(value) {
@@ -342,6 +347,14 @@ function render() {
     return;
   }
 
+  if (state.loadError) {
+    const error = document.createElement("div");
+    error.className = "empty";
+    error.textContent = `Saved miners could not be loaded from the server: ${state.loadError}`;
+    elements.list.append(error);
+    return;
+  }
+
   if (!state.miners.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
@@ -360,16 +373,11 @@ async function upsertMiner(formData) {
   const name = String(formData.get("name") || "").trim() || shortAddress(address);
   const id = `${host}:${address}`;
   const nextMiner = { id, name, address, host };
-  const existingIndex = state.miners.findIndex((miner) => miner.id === id);
-
-  if (existingIndex >= 0) {
-    state.miners[existingIndex] = nextMiner;
-  } else {
-    state.miners.push(nextMiner);
-  }
+  const nextMiners = state.miners.filter((miner) => miner.id !== id);
+  nextMiners.push(nextMiner);
 
   try {
-    await saveMiners();
+    state.miners = await saveMiners(nextMiners);
     elements.form.reset();
     render();
     refreshMiners();
@@ -381,10 +389,10 @@ async function upsertMiner(formData) {
 
 async function removeMiner(id) {
   const previousMiners = state.miners;
-  state.miners = state.miners.filter((miner) => miner.id !== id);
+  const nextMiners = state.miners.filter((miner) => miner.id !== id);
   state.results.delete(id);
   try {
-    await saveMiners();
+    state.miners = await saveMiners(nextMiners);
     render();
   } catch (error) {
     state.miners = previousMiners;
