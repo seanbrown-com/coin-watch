@@ -12,7 +12,9 @@ set -Eeuo pipefail
 #   APP_DIR=/srv/coin-watch SERVICE_NAME=coin-watch BRANCH=main ./scripts/update-service.sh
 
 APP_DIR="${APP_DIR:-/opt/coin-watch}"
+DATA_DIR="${DATA_DIR:-${APP_DIR}/data}"
 SERVICE_NAME="${SERVICE_NAME:-coin-watch}"
+SERVICE_USER="${SERVICE_USER:-coin-watch}"
 BRANCH="${BRANCH:-main}"
 NODE_BIN="${NODE_BIN:-node}"
 NPM_BIN="${NPM_BIN:-npm}"
@@ -62,6 +64,11 @@ fi
 
 log "Checking server syntax"
 "$NODE_BIN" --check server.js
+
+log "Ensuring shared data directory is writable"
+sudo mkdir -p "$DATA_DIR"
+sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
+sudo chmod 750 "$DATA_DIR"
 
 log "Restarting $SERVICE_NAME"
 sudo systemctl restart "$SERVICE_NAME"

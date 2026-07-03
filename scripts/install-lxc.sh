@@ -11,6 +11,7 @@ set -Eeuo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/seanbrown-com/coin-watch.git}"
 APP_DIR="${APP_DIR:-/opt/coin-watch}"
+DATA_DIR="${DATA_DIR:-${APP_DIR}/data}"
 SERVICE_NAME="${SERVICE_NAME:-coin-watch}"
 SERVICE_USER="${SERVICE_USER:-coin-watch}"
 BRANCH="${BRANCH:-main}"
@@ -52,6 +53,13 @@ create_user() {
     log "Creating service user $SERVICE_USER"
     useradd --system --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
   fi
+}
+
+create_data_dir() {
+  log "Preparing data directory $DATA_DIR"
+  mkdir -p "$DATA_DIR"
+  chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
+  chmod 750 "$DATA_DIR"
 }
 
 checkout_app() {
@@ -98,6 +106,7 @@ WorkingDirectory=${APP_DIR}
 Environment=NODE_ENV=production
 Environment=HOST=0.0.0.0
 Environment=PORT=${PORT}
+Environment=DATA_DIR=${DATA_DIR}
 ExecStart=/usr/bin/node ${APP_DIR}/server.js
 Restart=always
 RestartSec=5
@@ -128,6 +137,7 @@ need_command npm
 need_command systemctl
 create_user
 checkout_app
+create_data_dir
 install_dependencies
 write_service
 start_service

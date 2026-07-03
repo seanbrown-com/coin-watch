@@ -200,6 +200,22 @@ form label:nth-child(2) {
   grid-column: 1 / -1;
 }
 
+.form-status {
+  grid-column: 1 / -1;
+  min-height: 24px;
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.form-status.error {
+  color: var(--red);
+}
+
+.form-status.success {
+  color: var(--green);
+}
+
 .explain-band {
   padding: 24px 0;
 }

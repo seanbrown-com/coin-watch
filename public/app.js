@@ -27,6 +27,7 @@ const elements = {
   template: document.querySelector("#minerTemplate"),
   refreshNow: document.querySelector("#refreshNow"),
   refreshStatus: document.querySelector("#refreshStatus"),
+  formStatus: document.querySelector("#formStatus"),
   fleetHashrate: document.querySelector("#fleetHashrate"),
   fleetHashrateNote: document.querySelector("#fleetHashrateNote"),
   fleetWorkers: document.querySelector("#fleetWorkers"),
@@ -34,6 +35,11 @@ const elements = {
   fleetProgress: document.querySelector("#fleetProgress"),
   fleetProgressNote: document.querySelector("#fleetProgressNote")
 };
+
+function setFormStatus(message, tone = "") {
+  elements.formStatus.textContent = message;
+  elements.formStatus.className = `form-status ${tone}`.trim();
+}
 
 function loadLocalMiners() {
   try {
@@ -368,6 +374,7 @@ function render() {
 }
 
 async function upsertMiner(formData) {
+  setFormStatus("Saving miner...");
   const address = normalizeMinerAddress(formData.get("address"));
   const host = formData.get("host");
   const name = String(formData.get("name") || "").trim() || shortAddress(address);
@@ -379,10 +386,11 @@ async function upsertMiner(formData) {
   try {
     state.miners = await saveMiners(nextMiners);
     elements.form.reset();
+    setFormStatus("Miner saved for everyone.", "success");
     render();
     refreshMiners();
   } catch (error) {
-    state.results.set(id, { ok: false, error: error.message });
+    setFormStatus(error.message, "error");
     render();
   }
 }

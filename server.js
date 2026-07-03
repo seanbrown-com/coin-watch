@@ -128,7 +128,10 @@ async function writeSavedMiners(miners) {
 
   for (const miner of miners) {
     const next = normalizeMiner(miner);
-    if (!next || seen.has(next.id)) continue;
+    if (!next) {
+      throw new Error("One or more miners are invalid. Check the address and region.");
+    }
+    if (seen.has(next.id)) continue;
     seen.add(next.id);
     normalized.push(next);
   }
